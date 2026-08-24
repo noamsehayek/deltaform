@@ -53,6 +53,18 @@ function findRow(holdings, cusip) {
   return holdings.rows.common.find((r) => r.cusip === cusip) || holdings.rows.bonds.find((r) => r.cusip === cusip);
 }
 
+// Total time for this search is fundamentally bounded by SEC's rate limit —
+// there's no safe way to make dozens of live requests complete faster. A
+// live "checked N of M" counter at least makes that wait legible instead of
+// an opaque spinner. Keyed by CUSIP for simplicity; a second concurrent
+// search for the same CUSIP would share one progress entry, which is an
+// acceptable tradeoff for a personal-use tool.
+const progressByCusip = new Map();
+
+export function getCrossManagerProgress(cusip) {
+  return progressByCusip.get(cusip) || null;
+}
+
 /**
  * Diffs one filer's true MOST RECENT 13F-HR against their prior one for a
  * given CUSIP — never the specific (possibly years-old) filing where the
@@ -150,36 +162,48 @@ export async function crossManagerActivity(cusip, limit = 15) {
   const majorCiks = [...new Set(MAJOR_MANAGER_CIKS.map(padCik))];
   const ftsNeeded = Math.max(5, limit - majorCiks.length);
 
-  const majorsPromise = Promise.allSettled(majorCiks.map((cik) => diffCandidate(cusip, cik, null)));
+  const progress = { checked: 0, total: majorCiks.length };
+  progressByCusip.set(cusip, progress);
+  const trackedDiff = (cik, fallbackName) =>
+    diffCandidate(cusip, cik, fallbackName).finally(() => {
+      progress.checked++;
+    });
 
-  const ftsPromise = ftsSearchCusip(cusip, ftsNeeded).then(async ({ candidates: ftsCandidates, totalMentions }) => {
-    const seen = new Set(majorCiks);
-    const extras = [];
-    for (const c of ftsCandidates) {
-      const cik = padCik(c.cik);
-      if (seen.has(cik)) continue;
-      seen.add(cik);
-      extras.push({ cik, entityName: c.entityName });
-    }
-    const settled = await Promise.allSettled(extras.map((c) => diffCandidate(cusip, c.cik, c.entityName)));
-    return { settled, totalMentions, extraCount: extras.length };
-  });
+  try {
+    const majorsPromise = Promise.allSettled(majorCiks.map((cik) => trackedDiff(cik, null)));
 
-  const [majorsSettled, ftsOutcome] = await Promise.all([majorsPromise, ftsPromise]);
-  const checked = majorCiks.length + ftsOutcome.extraCount;
+    const ftsPromise = ftsSearchCusip(cusip, ftsNeeded).then(async ({ candidates: ftsCandidates, totalMentions }) => {
+      const seen = new Set(majorCiks);
+      const extras = [];
+      for (const c of ftsCandidates) {
+        const cik = padCik(c.cik);
+        if (seen.has(cik)) continue;
+        seen.add(cik);
+        extras.push({ cik, entityName: c.entityName });
+      }
+      progress.total = majorCiks.length + extras.length;
+      const settled = await Promise.allSettled(extras.map((c) => trackedDiff(c.cik, c.entityName)));
+      return { settled, totalMentions, extraCount: extras.length };
+    });
 
-  const results = [...majorsSettled, ...ftsOutcome.settled]
-    .filter((s) => s.status === 'fulfilled' && s.value)
-    .map((s) => s.value)
-    .sort((a, b) => b.shareDelta - a.shareDelta);
+    const [majorsSettled, ftsOutcome] = await Promise.all([majorsPromise, ftsPromise]);
+    const checked = majorCiks.length + ftsOutcome.extraCount;
 
-  return {
-    cusip,
-    totalMentions: ftsOutcome.totalMentions,
-    checked,
-    resolved: results.length,
-    buyers: results.filter((r) => r.verdict === 'NET BUY' || r.verdict === 'NEW POSITION').length,
-    sellers: results.filter((r) => r.verdict === 'NET SELL' || r.verdict === 'EXIT').length,
-    results,
-  };
+    const results = [...majorsSettled, ...ftsOutcome.settled]
+      .filter((s) => s.status === 'fulfilled' && s.value)
+      .map((s) => s.value)
+      .sort((a, b) => b.shareDelta - a.shareDelta);
+
+    return {
+      cusip,
+      totalMentions: ftsOutcome.totalMentions,
+      checked,
+      resolved: results.length,
+      buyers: results.filter((r) => r.verdict === 'NET BUY' || r.verdict === 'NEW POSITION').length,
+      sellers: results.filter((r) => r.verdict === 'NET SELL' || r.verdict === 'EXIT').length,
+      results,
+    };
+  } finally {
+    progressByCusip.delete(cusip);
+  }
 }

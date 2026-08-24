@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api.js';
 import { SearchIcon } from './Icons.jsx';
 
@@ -59,12 +59,39 @@ function MoversTable({ title, rows, tone }) {
 
 export default function CrossManagerPanel() {
   const [query, setQuery] = useState('');
-  const [limit, setLimit] = useState(50);
+  const [limit, setLimit] = useState(30);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [candidates, setCandidates] = useState(null); // ambiguous matches to pick from
   const [activeLabel, setActiveLabel] = useState(null);
+  const [activeCusip, setActiveCusip] = useState(null);
   const [result, setResult] = useState(null);
+  const [progress, setProgress] = useState(null);
+
+  // Total search time is bounded by SEC's rate limit — polling this just
+  // makes the wait legible ("checked 14 of 30") rather than making it
+  // shorter.
+  useEffect(() => {
+    if (!loading || !activeCusip) {
+      setProgress(null);
+      return;
+    }
+    let cancelled = false;
+    const poll = () => {
+      api
+        .crossManagerProgress(activeCusip)
+        .then((p) => {
+          if (!cancelled) setProgress(p);
+        })
+        .catch(() => {});
+    };
+    poll();
+    const id = setInterval(poll, 600);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [loading, activeCusip]);
 
   const topBuys = useMemo(() => {
     if (!result) return [];
@@ -87,6 +114,7 @@ export default function CrossManagerPanel() {
     setError(null);
     setResult(null);
     setActiveLabel(label || cusip);
+    setActiveCusip(cusip);
     try {
       setResult(await api.crossManager(cusip, limit));
     } catch (err) {
@@ -180,7 +208,11 @@ export default function CrossManagerPanel() {
           ))}
         </ul>
       )}
-      {loading && !candidates && <div className="loading">Checking managers, one moment…</div>}
+      {loading && !candidates && (
+        <div className="loading">
+          {progress?.total > 0 ? `Checking managers… (${progress.checked} / ${progress.total})` : 'Checking managers, one moment…'}
+        </div>
+      )}
       {result && (
         <div style={{ marginTop: 16 }}>
           <div className="row" style={{ justifyContent: 'space-between', marginBottom: 4, flexWrap: 'wrap' }}>

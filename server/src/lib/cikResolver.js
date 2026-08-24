@@ -59,8 +59,18 @@ export async function resolveManager(query) {
     }
   }
 
-  const [local, live] = await Promise.all([fuzzySearchFilers(q, 15), liveCompanySearch(q)]);
+  // The local filer index (built from SEC's own quarterly full-index files)
+  // covers 10,000+ filers and is instant — no network call. The live
+  // browse-edgar lookup is a much slower, older HTML-based endpoint
+  // (several seconds), so it's only worth paying for when the local index
+  // didn't already find a strong match: a filer freshly registered since
+  // the last ingest, or a name the local fuzzy scorer handles poorly.
+  const local = await fuzzySearchFilers(q, 15);
+  if (local.length > 0 && local[0].score >= 90) {
+    return { type: 'name', candidates: local };
+  }
 
+  const live = await liveCompanySearch(q);
   const byCik = new Map();
   for (const c of [...live, ...local]) {
     const existing = byCik.get(c.cik);
