@@ -1,0 +1,52 @@
+{
+  "name": "deltaform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DeltaForm by Noam Sehayek - quarter-over-quarter institutional 13F holdings analyzer",
+  "main": "electron/main.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "concurrently -n SERVER,CLIENT -c yellow,cyan \"npm:dev --prefix server\" \"npm:dev --prefix client\"",
+    "install:all": "npm install --prefix server && npm install --prefix client",
+    "test": "npm test --prefix server",
+    "build": "npm run build --prefix client",
+    "start": "node server/src/index.js",
+    "electron:dev": "electron .",
+    "electron:build": "npm run build --prefix client && electron-builder"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.noamsehayek.deltaform",
+    "productName": "DeltaForm",
+    "files": [
+      "electron/**/*",
+      "server/src/**/*",
+      "server/package.json",
+      "client/dist/**/*",
+      "!server/cache/**",
+      "!server/data/**",
+      "!server/tests/**",
+      "!server/fixtures/**"
+    ],
+    "extraResources": [
+      { "from": "server/node_modules", "to": "app/server/node_modules" }
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "asar": false,
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

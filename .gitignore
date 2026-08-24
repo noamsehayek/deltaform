@@ -1,0 +1,12 @@
+node_modules/
+dist/
+build/
+server/cache/**
+!server/cache/.gitkeep
+server/data/**
+!server/data/.gitkeep
+.env
+*.log
+.DS_Store
+src-tauri/target/
+release/

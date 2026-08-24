@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>DeltaForm Setup</title>
+    <style>
+      :root {
+        --bg: #05080a;
+        --panel: #10161a;
+        --border: rgba(255, 255, 255, 0.1);
+        --text: #dde8ea;
+        --text-dim: #8194a6;
+        --accent: #e8c06a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Consolas', 'Menlo', monospace;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .card {
+        width: 420px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 28px 30px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+        background: linear-gradient(120deg, #f3e3bd, var(--accent) 45%, #5fd0e0);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      p {
+        font-size: 12px;
+        color: var(--text-dim);
+        line-height: 1.6;
+      }
+      input {
+        width: 100%;
+        margin-top: 14px;
+        padding: 10px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.3);
+        color: var(--text);
+        font-family: inherit;
+        font-size: 13px;
+        outline: none;
+      }
+      input:focus {
+        border-color: var(--accent);
+      }
+      button {
+        margin-top: 14px;
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 6px;
+        border: none;
+        background: linear-gradient(135deg, var(--accent), #d9a94f);
+        color: #14100a;
+        font-weight: 600;
+        font-family: inherit;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .error {
+        color: #e0554e;
+        font-size: 11px;
+        margin-top: 8px;
+        min-height: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>DeltaForm — one-time setup</h1>
+      <p>
+        SEC EDGAR requires a real contact email on every request, or it blocks them. This is only sent to
+        SEC as part of standard identification headers — it isn't shared anywhere else, and this step only
+        happens once.
+      </p>
+      <form id="form">
+        <input type="email" id="email" placeholder="you@example.com" required autofocus />
+        <div class="error" id="error"></div>
+        <button type="submit" id="submit">Continue</button>
+      </form>
+    </div>
+    <script>
+      const form = document.getElementById('form');
+      const emailInput = document.getElementById('email');
+      const errorEl = document.getElementById('error');
+      const submitBtn = document.getElementById('submit');
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const email = emailInput.value.trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          errorEl.textContent = 'Enter a valid email address.';
+          return;
+        }
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Starting DeltaForm…';
+        window.onboarding.submitEmail(email);
+      });
+    </script>
+  </body>
+</html>
