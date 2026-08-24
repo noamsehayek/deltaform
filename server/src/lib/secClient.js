@@ -91,8 +91,19 @@ export async function secFetch(url, opts = {}) {
         'User-Agent': USER_AGENT,
         'Accept-Encoding': 'gzip, deflate',
       },
+      // Without an explicit timeout, a request SEC silently drops (rather
+      // than actively rejecting) hangs forever — fetch() has no default
+      // timeout. Fail loudly instead so this is diagnosable rather than an
+      // opaque hang that only surfaces as a platform-level 502 upstream.
+      signal: AbortSignal.timeout(20000),
     });
   } catch (err) {
+    if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+      throw new SecFetchError(
+        `SEC EDGAR did not respond within 20s for ${url} — the connection may be getting silently dropped from this network/host rather than actively rejected.`,
+        504
+      );
+    }
     throw new SecFetchError(`Network error contacting SEC EDGAR: ${err.message}`, 0);
   }
 
