@@ -64,7 +64,16 @@ app.listen(PORT, () => {
       'WARNING: SEC_CONTACT_EMAIL is not set (server/.env). All SEC EDGAR requests will fail with 403 until it is configured.'
     );
   } else {
-    triggerBackgroundIngest(12);
-    console.log('Started background ingest of the last 12 quarters of 13F filer history.');
+    // Delayed rather than fired immediately: on hosts that spin a service
+    // down after idle (Render's free tier, etc.), every cold start reboots
+    // this process from scratch, which would otherwise re-launch the full
+    // ingest at the exact moment the request that just woke the service is
+    // trying to get through — competing for the same throttled SEC request
+    // queue right when a real user is waiting on it. Giving the waking
+    // request a head start avoids that specific collision.
+    setTimeout(() => {
+      triggerBackgroundIngest(12);
+      console.log('Started background ingest of the last 12 quarters of 13F filer history.');
+    }, 15000);
   }
 });
