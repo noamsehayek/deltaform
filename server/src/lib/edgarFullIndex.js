@@ -98,7 +98,20 @@ function lastNQuarters(n) {
 let backgroundIngestPromise = null;
 let backgroundIngestStatus = { running: false, done: 0, total: 0, lastError: null };
 
-/** Kick off (idempotent) background ingestion of the last N quarters. Non-blocking. */
+/**
+ * Kick off (idempotent) background ingestion of the last N quarters.
+ * Non-blocking.
+ *
+ * Each quarter's master.idx fetch shares the same globally-throttled SEC
+ * request queue as live, user-facing requests (secClient.js serializes all
+ * outbound SEC calls to respect SEC's rate limit). Without a deliberate gap
+ * between quarters, this background maintenance work floods that queue back
+ * to back on startup, and a real search landing mid-burst can end up queued
+ * behind the whole batch — long enough on constrained hosting to trip a
+ * platform's reverse-proxy timeout (a 502) even though nothing crashed. The
+ * delay below is a cheap way to keep the queue fair without building a real
+ * priority scheduler.
+ */
 export function triggerBackgroundIngest(n = 12) {
   if (backgroundIngestPromise) return backgroundIngestStatus;
   const quarters = lastNQuarters(n);
@@ -111,6 +124,7 @@ export function triggerBackgroundIngest(n = 12) {
         backgroundIngestStatus.lastError = `${year}Q${qtr}: ${err.message}`;
       }
       backgroundIngestStatus.done++;
+      await new Promise((r) => setTimeout(r, 3000));
     }
     backgroundIngestStatus.running = false;
   })();
