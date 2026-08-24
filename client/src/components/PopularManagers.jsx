@@ -16,6 +16,14 @@ export const POPULAR_MANAGERS = [
   { label: 'Invesco', cik: '914208', name: 'Invesco Ltd.' },
   { label: 'Bank of America', cik: '70858', name: 'BANK OF AMERICA CORP /DE/' },
   { label: 'Berkshire Hathaway', cik: '1067983', name: 'BERKSHIRE HATHAWAY INC' },
+  { label: 'Citadel Advisors', cik: '1423053', name: 'CITADEL ADVISORS LLC' },
+  { label: 'Renaissance Technologies', cik: '1037389', name: 'RENAISSANCE TECHNOLOGIES LLC' },
+  { label: 'Bridgewater Associates', cik: '1350694', name: 'Bridgewater Associates, LP' },
+  { label: 'Millennium Management', cik: '1273087', name: 'MILLENNIUM MANAGEMENT LLC' },
+  // T. Rowe Price files 13F under two active entities in the same corporate
+  // family — this is the long-standing, high-volume one (248 filings vs. 17
+  // for the newer "T. Rowe Price Investment Management, Inc." CIK 1897612).
+  { label: 'T. Rowe Price', cik: '80255', name: 'PRICE T ROWE ASSOCIATES INC /MD/' },
 ];
 
 export default function PopularManagers({ onSelect, activeCik }) {
