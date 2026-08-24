@@ -1,6 +1,9 @@
-import { getSubmissions, get13FFilings } from './submissions.js';
+import { getSubmissions, get13FFilings, padCik } from './submissions.js';
 import { getInfoTableForFiling } from './filingDocs.js';
 import { learnCusips } from './cusipResolver.js';
+import { MAJOR_MANAGER_CIKS } from './majorManagers.js';
+
+const majorCikSet = new Set(MAJOR_MANAGER_CIKS.map(padCik));
 
 /** List a manager's 13F-HR filings, most recent first. */
 export async function listFilings(cik) {
@@ -25,28 +28,40 @@ export async function listFilings(cik) {
 // callers requesting the same filing coalesce into one parse instead of
 // racing to do the same work twice.
 //
-// Bounded to MAX_CACHE_ENTRIES with simple oldest-first eviction (a Map
-// preserves insertion order, so the first key is always the oldest) — an
-// unbounded version of this cache holding every filing ever fetched for the
-// life of the process is a real memory-growth risk: a single large filer's
-// parsed holdings can be substantial (Goldman Sachs' info table alone is
-// ~14,000 rows), and a ticker search checking 50-100 managers accumulates
-// many of those. On a memory-constrained host, that growth is exactly the
-// kind of thing that gets a process OOM-killed after enough searches.
-const holdingsCache = new Map();
-const MAX_CACHE_ENTRIES = 40;
+// Split into two tiers rather than one bounded cache:
+//
+//  - `pinnedCache` for the ~10 major managers, never evicted. This set is
+//    small and exactly known in advance (measured ~2-17MB per filing, so
+//    ~20 entries worst case for current+prior quarters — tens of MB, not a
+//    real memory risk), and it's the highest-value data to keep warm since
+//    every single ticker search re-checks these same managers. A single
+//    generic bounded cache doesn't protect this: one ticker search alone
+//    can touch up to `limit * 2` distinct filings (current + prior for each
+//    candidate), so a shared cache sized for "one search's worth" evicts
+//    the majors mid-search, defeating the entire point of caching them.
+//  - `lruCache` for everything else (candidates discovered via full-text
+//    search), bounded with oldest-first eviction so unbounded ticker-search
+//    variety over a long process lifetime can't grow without limit.
+const pinnedCache = new Map();
+const lruCache = new Map();
+const MAX_LRU_ENTRIES = 80;
 
 /** Fetch + parse one filing's holdings, and feed every (cusip, name) pair into the learning index. */
-export function getFilingHoldings(cik, accessionNumber) {
+export function getFilingHoldings(cikRaw, accessionNumber) {
+  const cik = padCik(cikRaw);
   const key = `${cik}:${accessionNumber}`;
-  if (holdingsCache.has(key)) {
-    // Refresh recency: delete + re-set moves this key to the end (newest)
-    // in Map's insertion-order iteration, so eviction below stays LRU rather
-    // than strictly FIFO.
-    const cached = holdingsCache.get(key);
-    holdingsCache.delete(key);
-    holdingsCache.set(key, cached);
-    return cached;
+  const cache = majorCikSet.has(cik) ? pinnedCache : lruCache;
+
+  if (cache.has(key)) {
+    if (cache === lruCache) {
+      // Refresh recency: delete + re-set moves this key to the end (newest)
+      // in Map's insertion-order iteration, so eviction below stays LRU
+      // rather than strictly FIFO.
+      const cached = cache.get(key);
+      cache.delete(key);
+      cache.set(key, cached);
+    }
+    return cache.get(key);
   }
 
   const promise = (async () => {
@@ -57,11 +72,13 @@ export function getFilingHoldings(cik, accessionNumber) {
   })();
 
   // Don't let a transient failure permanently poison the cache for this key.
-  promise.catch(() => holdingsCache.delete(key));
-  holdingsCache.set(key, promise);
+  promise.catch(() => cache.delete(key));
+  cache.set(key, promise);
 
-  while (holdingsCache.size > MAX_CACHE_ENTRIES) {
-    holdingsCache.delete(holdingsCache.keys().next().value);
+  if (cache === lruCache) {
+    while (lruCache.size > MAX_LRU_ENTRIES) {
+      lruCache.delete(lruCache.keys().next().value);
+    }
   }
 
   return promise;
