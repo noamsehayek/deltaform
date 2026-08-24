@@ -1,0 +1,10 @@
+{
+  "name": "deltaform-electron",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Electron/electron-builder tooling only — deliberately kept out of the root package.json so hosting platforms (Render, etc.) building the actual web app never need to install Electron's ~100MB binary.",
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}

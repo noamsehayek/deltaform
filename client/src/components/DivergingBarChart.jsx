@@ -65,7 +65,20 @@ export default function DivergingBarChart({ buys, sells, sortBy }) {
           <YAxis type="category" dataKey="name" width={110} stroke="#7c8f96" fontSize={11} interval={0} />
           <ReferenceLine x={0} stroke="#223035" />
           <Tooltip
-            contentStyle={{ background: '#10161a', border: '1px solid #223035', fontSize: 12 }}
+            // Recharts merges its own default tooltip style object (which uses
+            // longhand `backgroundColor`) with contentStyle — passing the
+            // `background` shorthand here let both keys coexist in the final
+            // inline style and the shorthand lost, leaving Recharts' default
+            // white background visible. Use matching longhand keys throughout.
+            contentStyle={{
+              backgroundColor: '#10161a',
+              border: '1px solid #223035',
+              borderRadius: 6,
+              padding: '8px 12px',
+            }}
+            labelStyle={{ color: '#dde8ea', fontWeight: 600, marginBottom: 4 }}
+            itemStyle={{ color: '#dde8ea', fontSize: 12, padding: 0 }}
+            cursor={{ fill: 'rgba(255,255,255,0.04)' }}
             labelFormatter={(_, payload) => (payload && payload[0] ? fullLabel(payload[0].payload.row) : '')}
             formatter={(value) => [fmt(value), sortBy === 'value' ? 'Δ Value' : 'Δ Shares']}
           />

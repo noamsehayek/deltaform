@@ -14,12 +14,34 @@ export async function listFilings(cik) {
   return { manager: { cik: sub.cik10, name: sub.name }, filings };
 }
 
+// A published filing never changes, so its parsed-and-merged holdings never
+// need to be recomputed once fetched — cache by (cik, accession) for the
+// life of the process. This matters a lot for large filers: cross-manager
+// ticker search unconditionally re-checks the same ~10 mega-cap managers on
+// every search, and without this, each one's often-multi-thousand-row XML
+// gets downloaded-and-reparsed from scratch every single time, even though
+// the underlying secClient disk cache already skips the network refetch.
+// Caches the in-flight promise (not just the resolved value) so concurrent
+// callers requesting the same filing coalesce into one parse instead of
+// racing to do the same work twice.
+const holdingsCache = new Map();
+
 /** Fetch + parse one filing's holdings, and feed every (cusip, name) pair into the learning index. */
-export async function getFilingHoldings(cik, accessionNumber) {
-  const result = await getInfoTableForFiling(cik, accessionNumber);
-  const allRows = [...result.rows.common, ...result.rows.options, ...result.rows.bonds];
-  await learnCusips(allRows.map((r) => ({ cusip: r.cusip, issuerName: r.nameOfIssuer })));
-  return result;
+export function getFilingHoldings(cik, accessionNumber) {
+  const key = `${cik}:${accessionNumber}`;
+  if (holdingsCache.has(key)) return holdingsCache.get(key);
+
+  const promise = (async () => {
+    const result = await getInfoTableForFiling(cik, accessionNumber);
+    const allRows = [...result.rows.common, ...result.rows.options, ...result.rows.bonds];
+    await learnCusips(allRows.map((r) => ({ cusip: r.cusip, issuerName: r.nameOfIssuer })));
+    return result;
+  })();
+
+  // Don't let a transient failure permanently poison the cache for this key.
+  promise.catch(() => holdingsCache.delete(key));
+  holdingsCache.set(key, promise);
+  return promise;
 }
 
 /** Resolve a filing record (from listFilings) by accession number. */

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SearchIcon, ArrowUpIcon, ArrowDownIcon } from './Icons.jsx';
 
 function fmtShares(n) {
   return new Intl.NumberFormat('en-US').format(Math.round(n));
@@ -40,13 +41,15 @@ export default function TickerLookup({ rows }) {
     <div className="panel">
       <h2>Ticker / Issuer Lookup</h2>
       <form className="row" onSubmit={search}>
-        <input
-          type="text"
-          placeholder="Ticker, issuer name, or CUSIP (e.g. IREN)"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          style={{ flex: 1, minWidth: 220 }}
-        />
+        <div className="input-with-icon" style={{ flex: 1, minWidth: 220 }}>
+          <SearchIcon className="input-icon" />
+          <input
+            type="text"
+            placeholder="Ticker, issuer name, or CUSIP (e.g. IREN)"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
         <button type="submit" className="primary">
           Look up
         </button>
@@ -71,7 +74,11 @@ export default function TickerLookup({ rows }) {
                 {Number.isFinite(row.pctChange) ? ` (${row.pctChange >= 0 ? '+' : ''}${row.pctChange.toFixed(1)}%)` : ''}
               </div>
             </div>
-            <div className={`verdict-big ${cls}`}>{verdict}</div>
+            <div className={`verdict-big ${cls}`}>
+              {cls === 'buy' && <ArrowUpIcon width={20} height={20} />}
+              {cls === 'sell' && <ArrowDownIcon width={20} height={20} />}
+              {verdict}
+            </div>
           </div>
         );
       })}

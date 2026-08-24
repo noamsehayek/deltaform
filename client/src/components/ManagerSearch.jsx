@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../lib/api.js';
+import { SearchIcon, BuildingIcon } from './Icons.jsx';
 
 export default function ManagerSearch({ onSelect }) {
   const [query, setQuery] = useState('');
@@ -34,13 +35,15 @@ export default function ManagerSearch({ onSelect }) {
     <div className="panel">
       <h2>Manager</h2>
       <form className="row" onSubmit={search}>
-        <input
-          type="text"
-          placeholder="Manager name or CIK (e.g. Berkshire Hathaway or 0001067983)"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          style={{ flex: 1, minWidth: 260 }}
-        />
+        <div className="input-with-icon" style={{ flex: 1, minWidth: 260 }}>
+          <SearchIcon className="input-icon" />
+          <input
+            type="text"
+            placeholder="Manager name or CIK (e.g. Berkshire Hathaway or 0001067983)"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
         <button type="submit" className="primary" disabled={loading}>
           {loading ? 'Searching…' : 'Search'}
         </button>
@@ -57,7 +60,10 @@ export default function ManagerSearch({ onSelect }) {
                 setQuery(c.name);
               }}
             >
-              <span>{c.name}</span>
+              <span className="row" style={{ gap: 8 }}>
+                <BuildingIcon className="dim" />
+                {c.name}
+              </span>
               <span className="dim">CIK {c.cik} · {c.source}</span>
             </li>
           ))}

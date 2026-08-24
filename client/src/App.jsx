@@ -11,8 +11,12 @@ import Watchlist from './components/Watchlist.jsx';
 import PopularManagers from './components/PopularManagers.jsx';
 import CrossManagerPanel from './components/CrossManagerPanel.jsx';
 import Footer from './components/Footer.jsx';
+import WelcomeHero from './components/WelcomeHero.jsx';
+import Skeleton from './components/Skeleton.jsx';
+import { StarIcon, BuildingIcon } from './components/Icons.jsx';
 
 export default function App() {
+  const [searchMode, setSearchMode] = useState('manager'); // 'manager' | 'ticker'
   const [manager, setManager] = useState(null);
   const [filings, setFilings] = useState([]);
   const [accessionA, setAccessionA] = useState('');
@@ -124,77 +128,103 @@ export default function App() {
       </aside>
 
       <main className="main">
-        <ManagerSearch onSelect={selectManager} />
+        <div className="tabs" style={{ marginBottom: 18 }}>
+          <button className={searchMode === 'manager' ? 'active' : ''} onClick={() => setSearchMode('manager')}>
+            Search by Manager
+          </button>
+          <button className={searchMode === 'ticker' ? 'active' : ''} onClick={() => setSearchMode('ticker')}>
+            Search by Ticker
+          </button>
+        </div>
 
-        {manager && filings.length > 0 && (
-          <div className="panel">
-            <div className="row" style={{ justifyContent: 'space-between' }}>
-              <div>
-                <strong>{manager.name}</strong> <span className="dim">CIK {manager.cik}</span>
-              </div>
-              <button onClick={onWatchManager}>★ Watch manager</button>
-            </div>
-          </div>
-        )}
+        {searchMode === 'ticker' && <CrossManagerPanel />}
 
-        {manager && filings.length > 0 && (
-          <QuarterPicker
-            filings={filings}
-            accessionA={accessionA}
-            accessionB={accessionB}
-            onChange={(a, b) => {
-              setAccessionA(a);
-              setAccessionB(b);
-            }}
-          />
-        )}
-
-        {error && <div className="error-banner">{error}</div>}
-        {loading && <div className="loading">Loading from SEC EDGAR…</div>}
-
-        {compare && (
+        {searchMode === 'manager' && (
           <>
-            <TickerLookup rows={compare.common.rows} />
+            <ManagerSearch onSelect={selectManager} />
 
-            <div className="panel">
-              <div className="row" style={{ justifyContent: 'space-between' }}>
-                <div className="filing-meta">
-                  Comparing {compare.filingA.period} (filed {compare.filingA.filingDate}, accession{' '}
-                  {compare.filingA.accession}) → {compare.filingB.period} (filed {compare.filingB.filingDate},
-                  accession {compare.filingB.accession})
-                </div>
-                <div className="toggle-group">
-                  <button className={sortBy === 'shares' ? 'active' : ''} onClick={() => setSortBy('shares')}>
-                    Sort: Shares
-                  </button>
-                  <button className={sortBy === 'value' ? 'active' : ''} onClick={() => setSortBy('value')}>
-                    Sort: $ Value
+            {!manager && !loading && <WelcomeHero />}
+
+            {manager && filings.length > 0 && (
+              <div className="panel">
+                <div className="row" style={{ justifyContent: 'space-between' }}>
+                  <div className="row" style={{ gap: 10 }}>
+                    <BuildingIcon style={{ color: 'var(--accent)' }} />
+                    <div>
+                      <strong>{manager.name}</strong> <span className="dim">CIK {manager.cik}</span>
+                    </div>
+                  </div>
+                  <button onClick={onWatchManager}>
+                    <StarIcon />
+                    Watch manager
                   </button>
                 </div>
               </div>
-            </div>
+            )}
 
-            <StatsPanel stats={compare.common.stats} />
-            <DivergingBarChart buys={compare.common.buys} sells={compare.common.sells} sortBy={sortBy} />
-
-            <div className="tabs">
-              {['common', 'options', 'bonds'].map((t) => (
-                <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
-                  {t === 'common' ? 'Common Stock' : t === 'options' ? 'Options' : 'Bonds / Other'} (
-                  {compare[t].rows.length})
-                </button>
-              ))}
-            </div>
-            {section && (
-              <HoldingsTable
-                section={section}
-                title={tab === 'common' ? 'Common Stock Holdings' : tab === 'options' ? 'Options (Put/Call)' : 'Bonds / Principal Amount'}
-                onWatch={onWatchTicker}
-                onTickerMapped={runCompare}
+            {manager && filings.length > 0 && (
+              <QuarterPicker
+                filings={filings}
+                accessionA={accessionA}
+                accessionB={accessionB}
+                onChange={(a, b) => {
+                  setAccessionA(a);
+                  setAccessionB(b);
+                }}
               />
             )}
 
-            <CrossManagerPanel />
+            {error && <div className="error-banner">{error}</div>}
+            {loading && (
+              <>
+                <div className="loading">Loading from SEC EDGAR…</div>
+                <Skeleton />
+              </>
+            )}
+
+            {compare && (
+              <>
+                <TickerLookup rows={compare.common.rows} />
+
+                <div className="panel">
+                  <div className="row" style={{ justifyContent: 'space-between' }}>
+                    <div className="filing-meta">
+                      Comparing {compare.filingA.period} (filed {compare.filingA.filingDate}, accession{' '}
+                      {compare.filingA.accession}) → {compare.filingB.period} (filed {compare.filingB.filingDate},
+                      accession {compare.filingB.accession})
+                    </div>
+                    <div className="toggle-group">
+                      <button className={sortBy === 'shares' ? 'active' : ''} onClick={() => setSortBy('shares')}>
+                        Sort: Shares
+                      </button>
+                      <button className={sortBy === 'value' ? 'active' : ''} onClick={() => setSortBy('value')}>
+                        Sort: $ Value
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <StatsPanel stats={compare.common.stats} />
+                <DivergingBarChart buys={compare.common.buys} sells={compare.common.sells} sortBy={sortBy} />
+
+                <div className="tabs">
+                  {['common', 'options', 'bonds'].map((t) => (
+                    <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
+                      {t === 'common' ? 'Common Stock' : t === 'options' ? 'Options' : 'Bonds / Other'} (
+                      {compare[t].rows.length})
+                    </button>
+                  ))}
+                </div>
+                {section && (
+                  <HoldingsTable
+                    section={section}
+                    title={tab === 'common' ? 'Common Stock Holdings' : tab === 'options' ? 'Options (Put/Call)' : 'Bonds / Principal Amount'}
+                    onWatch={onWatchTicker}
+                    onTickerMapped={runCompare}
+                  />
+                )}
+              </>
+            )}
           </>
         )}
 

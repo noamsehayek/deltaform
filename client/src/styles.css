@@ -25,6 +25,8 @@
   --radius-sm: 6px;
   --radius: 10px;
   --radius-lg: 14px;
+  --clip: 14px;
+  --clip-sm: 7px;
   --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 20px 40px -20px rgba(0, 0, 0, 0.6);
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
 
@@ -69,6 +71,34 @@ body::before {
     linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px);
   background-size: 42px 42px;
   mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 90%);
+}
+
+/* slow ambient scan sweep — a faint light band drifting down the whole page */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(180deg, transparent 0%, rgba(232, 192, 106, 0.05) 48%, transparent 100%);
+  background-size: 100% 300%;
+  animation: scanSweep 9s linear infinite;
+}
+
+@keyframes scanSweep {
+  0% {
+    background-position: 0 -100%;
+  }
+  100% {
+    background-position: 0 200%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::after {
+    animation: none;
+    display: none;
+  }
 }
 
 ::selection {
@@ -212,6 +242,7 @@ a:hover {
 }
 
 .status-dot {
+  position: relative;
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -229,6 +260,34 @@ a:hover {
   box-shadow: 0 0 0 3px var(--sell-bg), 0 0 8px var(--sell-glow);
 }
 
+/* radar-ping: an expanding, fading ring — "live" telemetry feel */
+.status-dot.ok::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1px solid var(--buy);
+  animation: radarPing 2.2s ease-out infinite;
+}
+
+@keyframes radarPing {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-dot.ok::after {
+    animation: none;
+    display: none;
+  }
+}
+
 /* ---------------------------------------------------------------------- */
 /* Panels                                                                  */
 /* ---------------------------------------------------------------------- */
@@ -239,11 +298,44 @@ a:hover {
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-panel);
-  padding: 18px 20px;
+  /* angular cut corners instead of rounded — the HUD-panel silhouette */
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--clip)) 0,
+    100% var(--clip),
+    100% 100%,
+    var(--clip) 100%,
+    0 calc(100% - var(--clip))
+  );
+  filter: drop-shadow(0 16px 32px rgba(0, 0, 0, 0.55));
+  padding: 20px 22px;
   margin-bottom: 16px;
   animation: fadeIn 0.3s var(--ease);
+}
+
+/* corner bracket accents on the two un-cut corners, like a targeting frame */
+.panel::before,
+.panel::after {
+  content: '';
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  pointer-events: none;
+  opacity: 0.75;
+}
+
+.panel::before {
+  top: 0;
+  left: 0;
+  border-top: 2px solid var(--accent);
+  border-left: 2px solid var(--accent);
+}
+
+.panel::after {
+  bottom: 0;
+  right: 0;
+  border-bottom: 2px solid var(--cyan);
+  border-right: 2px solid var(--cyan);
 }
 
 .panel h2 {
@@ -265,6 +357,17 @@ a:hover {
   border-radius: 2px;
   background: linear-gradient(180deg, var(--accent), var(--cyan));
   box-shadow: 0 0 8px var(--accent-glow);
+  animation: pulseBar 2.4s ease-in-out infinite;
+}
+
+@keyframes pulseBar {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 .row {
@@ -284,7 +387,7 @@ select {
   border: 1px solid var(--border);
   color: var(--text);
   padding: 9px 12px;
-  border-radius: var(--radius-sm);
+  clip-path: polygon(0 0, calc(100% - var(--clip-sm)) 0, 100% var(--clip-sm), 100% 100%, var(--clip-sm) 100%, 0 calc(100% - var(--clip-sm)));
   outline: none;
   transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
 }
@@ -304,15 +407,56 @@ select option {
   color: var(--text);
 }
 
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-icon input[type='text'] {
+  width: 100%;
+  padding-left: 34px;
+}
+
+.input-with-icon .input-icon {
+  position: absolute;
+  left: 11px;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
 button {
+  position: relative;
+  overflow: hidden;
   background: var(--panel-2);
   border: 1px solid var(--border);
   color: var(--text);
   padding: 9px 15px;
-  border-radius: var(--radius-sm);
+  clip-path: polygon(0 0, calc(100% - var(--clip-sm)) 0, 100% var(--clip-sm), 100% 100%, var(--clip-sm) 100%, 0 calc(100% - var(--clip-sm)));
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  font-size: 11.5px;
   cursor: pointer;
   transition: border-color 0.15s var(--ease), color 0.15s var(--ease), background 0.15s var(--ease),
     box-shadow 0.15s var(--ease), transform 0.1s var(--ease);
+}
+
+/* light sweep across the button on hover — classic HUD-interaction detail */
+button::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.5s var(--ease);
+  pointer-events: none;
+}
+
+button:hover::after {
+  left: 130%;
 }
 
 button:hover {
@@ -418,9 +562,10 @@ button:disabled {
 }
 
 .verdict-card {
+  position: relative;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px 20px;
+  clip-path: polygon(0 0, calc(100% - var(--clip)) 0, 100% var(--clip), 100% 100%, var(--clip) 100%, 0 calc(100% - var(--clip)));
+  padding: 18px 22px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -428,10 +573,37 @@ button:disabled {
   transition: box-shadow 0.2s var(--ease);
 }
 
+.verdict-card::before,
+.verdict-card::after {
+  content: '';
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.verdict-card::before {
+  top: 0;
+  left: 0;
+  border-top: 2px solid var(--accent);
+  border-left: 2px solid var(--accent);
+}
+
+.verdict-card::after {
+  bottom: 0;
+  right: 0;
+  border-bottom: 2px solid var(--cyan);
+  border-right: 2px solid var(--cyan);
+}
+
 .verdict-big {
   font-size: 22px;
   font-weight: 700;
   letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .verdict-big.buy {
@@ -533,6 +705,25 @@ tbody tr:hover {
   background: rgba(255, 255, 255, 0.035);
 }
 
+/* row-level color tint for the cross-manager ticker search table — a subtle
+   green/red wash across the whole row, not just the delta cell, so a long
+   scanning list of managers reads at a glance. */
+.xmgr-table tbody tr.row-pos {
+  background: var(--buy-bg);
+}
+
+.xmgr-table tbody tr.row-neg {
+  background: var(--sell-bg);
+}
+
+.xmgr-table tbody tr.row-pos:hover {
+  background: rgba(63, 182, 139, 0.18);
+}
+
+.xmgr-table tbody tr.row-neg:hover {
+  background: rgba(224, 85, 78, 0.18);
+}
+
 .table-wrap {
   overflow-x: auto;
   max-height: 480px;
@@ -618,6 +809,9 @@ tbody tr:hover {
   padding: 6px 11px;
   font-size: 11px;
   border-radius: 999px;
+  clip-path: none;
+  text-transform: none;
+  letter-spacing: normal;
   background: var(--panel-2);
   border: 1px solid var(--border);
   box-shadow: none;
@@ -691,6 +885,7 @@ tbody tr:hover {
 .tabs button {
   border: none;
   border-radius: var(--radius-sm);
+  clip-path: none;
   background: transparent;
   box-shadow: none;
 }
@@ -717,6 +912,7 @@ tbody tr:hover {
 .toggle-group button {
   border: none;
   border-radius: 0;
+  clip-path: none;
   border-right: 1px solid var(--border-soft);
   box-shadow: none;
 }
@@ -732,4 +928,187 @@ tbody tr:hover {
 .toggle-group button.active {
   background: linear-gradient(135deg, var(--accent), #d9a94f);
   color: #14100a;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Icons                                                                   */
+/* ---------------------------------------------------------------------- */
+
+svg {
+  flex-shrink: 0;
+  vertical-align: -2px;
+}
+
+button svg {
+  margin-right: 5px;
+}
+
+.icon-btn {
+  padding: 6px 8px;
+}
+
+.icon-btn svg {
+  margin-right: 0;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Welcome hero (empty state, before a manager is selected)               */
+/* ---------------------------------------------------------------------- */
+
+.hero-panel {
+  position: relative;
+  overflow: hidden;
+  padding: 36px 34px;
+}
+
+.hero-glow {
+  position: absolute;
+  top: -140px;
+  right: -100px;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--accent-glow), transparent 70%);
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+.hero-content {
+  position: relative;
+}
+
+.hero-title {
+  font-size: 26px;
+  line-height: 1.25;
+  margin: 0 0 14px;
+  max-width: 620px;
+  font-weight: 700;
+  background: linear-gradient(120deg, var(--text), var(--text) 60%, var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero-sub {
+  color: var(--text-dim);
+  max-width: 560px;
+  line-height: 1.7;
+  margin: 0 0 28px;
+  font-size: 12.5px;
+}
+
+.hero-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.hero-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.hero-step strong {
+  font-size: 12.5px;
+  display: block;
+  margin-bottom: 3px;
+}
+
+.hero-step .dim {
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.hero-step-icon {
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  border-radius: 8px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  border: 1px solid rgba(232, 192, 106, 0.2);
+  flex-shrink: 0;
+}
+
+.hero-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-faint);
+  padding-top: 18px;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Skeleton loading                                                        */
+/* ---------------------------------------------------------------------- */
+
+.skeleton-line {
+  border-radius: 4px;
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0.04) 30%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.04) 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Responsive                                                              */
+/* ---------------------------------------------------------------------- */
+
+@media (max-width: 860px) {
+  .app {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: relative;
+    height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+  }
+
+  .logo {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .logo small {
+    display: none;
+  }
+
+  .status-row {
+    margin-left: auto;
+  }
+
+  .sidebar > div:nth-child(3),
+  .sidebar > div:nth-child(4) {
+    flex-basis: 100%;
+  }
+
+  .main {
+    padding: 20px 16px 48px;
+  }
+
+  .hero-title {
+    font-size: 21px;
+  }
 }

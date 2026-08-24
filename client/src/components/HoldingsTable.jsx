@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { api } from '../lib/api.js';
 import { rowsToCsv, downloadCsv } from '../lib/csv.js';
+import { DownloadIcon, StarIcon } from './Icons.jsx';
 
 function fmtShares(n) {
   return new Intl.NumberFormat('en-US').format(Math.round(n));
@@ -76,7 +77,10 @@ export default function HoldingsTable({ section, title, onWatch, onTickerMapped 
     <div className="panel">
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <h2 style={{ margin: 0 }}>{title}</h2>
-        <button onClick={exportCsv}>Export CSV</button>
+        <button onClick={exportCsv}>
+          <DownloadIcon />
+          Export CSV
+        </button>
       </div>
       <div className="table-wrap">
         <table>
@@ -129,10 +133,11 @@ export default function HoldingsTable({ section, title, onWatch, onTickerMapped 
                 </td>
                 <td>
                   <button
-                    className="dim"
+                    className="dim icon-btn"
                     onClick={() => onWatch?.({ type: 'ticker', ticker: r.ticker, cusip: r.cusip, name: r.nameOfIssuer })}
+                    title="Add to watchlist"
                   >
-                    ★
+                    <StarIcon />
                   </button>
                 </td>
               </tr>

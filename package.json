@@ -13,17 +13,17 @@
     "test": "npm test --prefix server",
     "build": "npm run build --prefix client",
     "start": "node server/src/index.js",
-    "electron:dev": "electron .",
-    "electron:build": "npm run build --prefix client && electron-builder"
+    "electron:install": "npm install --prefix electron",
+    "electron:dev": "npx --prefix electron electron .",
+    "electron:build": "npm run build --prefix client && npx --prefix electron electron-builder --projectDir ."
   },
   "devDependencies": {
-    "concurrently": "^8.2.2",
-    "electron": "^32.0.0",
-    "electron-builder": "^25.0.0"
+    "concurrently": "^8.2.2"
   },
   "build": {
     "appId": "com.noamsehayek.deltaform",
     "productName": "DeltaForm",
+    "electronVersion": "32.3.3",
     "files": [
       "electron/**/*",
       "server/src/**/*",
