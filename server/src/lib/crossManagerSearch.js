@@ -93,13 +93,11 @@ async function diffCandidate(cusip, cik, fallbackName) {
 
   const rowNow = findRow(holdingsNow, cusip);
   let sharesPrior = 0;
-  let valueUsdPrior = 0;
   let hadPrior = false;
   if (holdingsPrior) {
     const rowPrior = findRow(holdingsPrior, cusip);
     if (rowPrior) {
       sharesPrior = rowPrior.shares;
-      valueUsdPrior = rowPrior.valueUsd || 0;
       hadPrior = true;
     }
   }
@@ -133,8 +131,6 @@ async function diffCandidate(cusip, cik, fallbackName) {
     shareDelta,
     pctChange,
     valueUsdNow: rowNow?.valueUsd || 0,
-    valueUsdPrior,
-    valueDelta: (rowNow?.valueUsd || 0) - valueUsdPrior,
     verdict,
   };
 }
