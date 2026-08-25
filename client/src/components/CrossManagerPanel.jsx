@@ -5,6 +5,9 @@ import { SearchIcon } from './Icons.jsx';
 function fmtShares(n) {
   return new Intl.NumberFormat('en-US').format(Math.round(n));
 }
+function fmtUsd(n) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+}
 function fmtPct(n) {
   if (!Number.isFinite(n)) return 'NEW';
   return `${n >= 0 ? '+' : ''}${n.toFixed(0)}%`;
@@ -115,13 +118,23 @@ export default function CrossManagerPanel() {
     if (!result) return null;
     let bought = 0;
     let sold = 0;
+    let boughtUsd = 0;
+    let soldUsd = 0;
     for (const r of result.results) {
       if (r.shareDelta > 0) bought += r.shareDelta;
       else if (r.shareDelta < 0) sold += -r.shareDelta;
+      if (r.valueDelta > 0) boughtUsd += r.valueDelta;
+      else if (r.valueDelta < 0) soldUsd += -r.valueDelta;
     }
     const net = bought - sold;
+    const netUsd = boughtUsd - soldUsd;
     const verdict = net > 0 ? 'buy' : net < 0 ? 'sell' : 'neutral';
-    return { bought, sold, net, verdict };
+    // Dollar value is the more meaningful signal — a few large-cap managers with
+    // small share counts but huge position sizes can outweigh many small managers
+    // trading large share counts of a cheaper stock. Tracked separately from the
+    // share-based verdict above because the two can disagree.
+    const verdictUsd = netUsd > 0 ? 'buy' : netUsd < 0 ? 'sell' : 'neutral';
+    return { bought, sold, net, verdict, boughtUsd, soldUsd, netUsd, verdictUsd };
   }, [result]);
 
   async function searchCusip(cusip, label) {
@@ -272,6 +285,53 @@ export default function CrossManagerPanel() {
                   <div className={`value ${netSummary.verdict === 'buy' ? 'buy' : netSummary.verdict === 'sell' ? 'sell' : ''}`}>
                     {netSummary.net >= 0 ? '+' : ''}
                     {fmtShares(netSummary.net)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {netSummary && (
+            <div
+              className={`verdict-card ${netSummary.verdictUsd === 'sell' ? 'sell' : ''}`}
+              style={{ marginTop: 8 }}
+            >
+              <div>
+                <div className="dim" style={{ marginBottom: 6 }}>
+                  Net by dollar value
+                </div>
+                <div
+                  className={`verdict-big ${
+                    netSummary.verdictUsd === 'buy' ? 'buy' : netSummary.verdictUsd === 'sell' ? 'sell' : ''
+                  }`}
+                >
+                  {netSummary.verdictUsd === 'buy' && '▲ NET BUY'}
+                  {netSummary.verdictUsd === 'sell' && '▼ NET SELL'}
+                  {netSummary.verdictUsd === 'neutral' && 'FLAT'}
+                </div>
+                {netSummary.verdictUsd !== netSummary.verdict && (
+                  <div className="dim" style={{ marginTop: 6, fontSize: 11, maxWidth: 260 }}>
+                    ⚠ Disagrees with the share-count verdict above — a few large positions are outweighing share
+                    count here.
+                  </div>
+                )}
+              </div>
+              <div className="stats-grid" style={{ minWidth: 320 }}>
+                <div className="stat-tile">
+                  <div className="label">Total Bought</div>
+                  <div className="value buy">+{fmtUsd(netSummary.boughtUsd)}</div>
+                </div>
+                <div className="stat-tile">
+                  <div className="label">Total Sold</div>
+                  <div className="value sell">-{fmtUsd(netSummary.soldUsd)}</div>
+                </div>
+                <div className="stat-tile">
+                  <div className="label">Net Value</div>
+                  <div
+                    className={`value ${netSummary.verdictUsd === 'buy' ? 'buy' : netSummary.verdictUsd === 'sell' ? 'sell' : ''}`}
+                  >
+                    {netSummary.netUsd >= 0 ? '+' : ''}
+                    {fmtUsd(netSummary.netUsd)}
                   </div>
                 </div>
               </div>
