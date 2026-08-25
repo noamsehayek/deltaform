@@ -204,6 +204,14 @@ export async function crossManagerActivity(cusip, limit = 15) {
       results,
     };
   } finally {
-    progressByCusip.delete(cusip);
+    // A second concurrent search for the same CUSIP overwrites this map entry
+    // with its own progress object (see comment on progressByCusip above).
+    // Only delete the entry if it still belongs to *this* call — otherwise
+    // finishing first would wipe out the other, still-running search's
+    // progress, making its progress bar disappear/reset mid-search even
+    // though it hasn't actually finished.
+    if (progressByCusip.get(cusip) === progress) {
+      progressByCusip.delete(cusip);
+    }
   }
 }

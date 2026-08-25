@@ -17,25 +17,35 @@ const TWELVE_HOURS = 12 * 60 * 60 * 1000;
 
 /** @type {{ byTicker: Map<string,{cik:string,title:string}>, byNormName: Map<string,{ticker:string,cik:string,title:string}[]> } | null} */
 let companyTickersCache = null;
+// In-flight load, cached separately from the resolved value so concurrent
+// callers before the first load finishes await the SAME fetch+parse instead
+// of each independently kicking off their own (see loadCusipIndex below for
+// why check-then-await-then-assign is unsafe here).
+let companyTickersLoading = null;
 
 async function loadCompanyTickers() {
   if (companyTickersCache) return companyTickersCache;
-  const data = await secFetch('https://www.sec.gov/files/company_tickers.json', {
-    as: 'json',
-    ttlMs: TWELVE_HOURS,
-  });
-  const byTicker = new Map();
-  const byNormName = new Map();
-  for (const row of Object.values(data)) {
-    const ticker = String(row.ticker).toUpperCase();
-    const entry = { ticker, cik: String(row.cik_str), title: row.title };
-    byTicker.set(ticker, entry);
-    const key = normalizeName(row.title);
-    if (!byNormName.has(key)) byNormName.set(key, []);
-    byNormName.get(key).push(entry);
+  if (!companyTickersLoading) {
+    companyTickersLoading = (async () => {
+      const data = await secFetch('https://www.sec.gov/files/company_tickers.json', {
+        as: 'json',
+        ttlMs: TWELVE_HOURS,
+      });
+      const byTicker = new Map();
+      const byNormName = new Map();
+      for (const row of Object.values(data)) {
+        const ticker = String(row.ticker).toUpperCase();
+        const entry = { ticker, cik: String(row.cik_str), title: row.title };
+        byTicker.set(ticker, entry);
+        const key = normalizeName(row.title);
+        if (!byNormName.has(key)) byNormName.set(key, []);
+        byNormName.get(key).push(entry);
+      }
+      companyTickersCache = { byTicker, byNormName };
+      return companyTickersCache;
+    })();
   }
-  companyTickersCache = { byTicker, byNormName };
-  return companyTickersCache;
+  return companyTickersLoading;
 }
 
 /** Look up SEC's canonical (CIK, title) for a ticker, independent of anything DeltaForm has parsed yet. */
@@ -52,15 +62,36 @@ export async function lookupCompanyTicker(ticker) {
 
 /** @type {Record<string, { names: string[], ticker: string|null, manualTicker: string|null, lastSeen: string }> | null} */
 let cusipIndex = null;
+// In-flight load promise, tracked separately from `cusipIndex` itself.
+//
+// Without this, two concurrent callers hitting a cold cache (e.g. the ~20
+// getFilingHoldings() calls crossManagerActivity fires concurrently for the
+// major managers on the very first search after a server (re)start) would
+// each see `cusipIndex` as null, each independently read+parse (or fall back
+// to `{}` on ENOENT) the index file, and each assign their own fresh object
+// to the shared `cusipIndex` variable. Since persistCusipIndex() always
+// serializes whatever `cusipIndex` currently points to (not the caller's
+// locally-captured reference), whichever load happened LAST wins the module
+// variable — every CUSIP an earlier concurrent caller had already learned
+// into its own now-orphaned object is silently dropped and never persisted.
+// Caching the in-flight promise (mirrors getFilingHoldings' pattern) ensures
+// every concurrent caller before the first load resolves shares the exact
+// same object, so their mutations land on the one true `cusipIndex`.
+let cusipIndexLoading = null;
 
 async function loadCusipIndex() {
   if (cusipIndex) return cusipIndex;
-  try {
-    cusipIndex = JSON.parse(await fsp.readFile(CUSIP_INDEX_FILE, 'utf-8'));
-  } catch {
-    cusipIndex = {};
+  if (!cusipIndexLoading) {
+    cusipIndexLoading = (async () => {
+      try {
+        cusipIndex = JSON.parse(await fsp.readFile(CUSIP_INDEX_FILE, 'utf-8'));
+      } catch {
+        cusipIndex = {};
+      }
+      return cusipIndex;
+    })();
   }
-  return cusipIndex;
+  return cusipIndexLoading;
 }
 
 // Serialize writes and write atomically (temp file + rename) so concurrent

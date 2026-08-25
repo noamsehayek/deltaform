@@ -62,7 +62,19 @@ compareRouter.get('/:cik', async (req, res, next) => {
 compareRouter.get('/:cik/verdict/:cusip', async (req, res, next) => {
   try {
     const { cik, cusip } = req.params;
-    const { filings } = await listFilings(cik);
+    const { manager, filings } = await listFilings(cik);
+
+    // Without this, a manager with only one 13F-HR on file and no explicit
+    // accessionA/B falls through to `filings[1]` being undefined, and the
+    // getFilingHoldings() call below throws a raw "Cannot read properties of
+    // undefined" TypeError instead of a clear, actionable message — unlike
+    // the sibling /:cik compare route, which already guards this case.
+    if (!req.query.accessionA && !req.query.accessionB && filings.length < 2) {
+      return res.status(404).json({
+        error: `Only one 13F-HR filing exists for ${manager.name} — need at least two quarters to compare.`,
+      });
+    }
+
     const filingMetaA = req.query.accessionA ? findFiling(filings, req.query.accessionA) : filings[1];
     const filingMetaB = req.query.accessionB ? findFiling(filings, req.query.accessionB) : filings[0];
 
