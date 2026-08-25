@@ -57,9 +57,30 @@ function zipFilings(recent) {
   return rows;
 }
 
-/** Filter a filer's full filing list down to 13F-HR (and amendments), most recent quarter first. */
+/**
+ * Filter a filer's full filing list down to 13F-HR (and amendments), one
+ * filing per reporting period, most recent quarter first.
+ *
+ * A period can have multiple filings: an original 13F-HR plus one or more
+ * 13F-HR/A amendments that supersede it (often filed within days, sometimes
+ * correcting real data-entry mistakes in the original). Callers diff
+ * "current" against "prior" by simple list position, so if both an
+ * amendment and its original stayed in the list, "prior" could silently
+ * mean "this same quarter's un-amended original" instead of last quarter —
+ * comparing a filer's own revision against itself rather than a real
+ * quarter-over-quarter change. Collapsing to the latest filing per period
+ * first ensures every entry is a distinct quarter.
+ */
 export function get13FFilings(filings) {
-  return filings
-    .filter((f) => f.form === '13F-HR' || f.form === '13F-HR/A')
-    .sort((a, b) => (a.periodOfReport > b.periodOfReport ? -1 : a.periodOfReport < b.periodOfReport ? 1 : 0));
+  const byPeriod = new Map();
+  for (const f of filings) {
+    if (f.form !== '13F-HR' && f.form !== '13F-HR/A') continue;
+    const existing = byPeriod.get(f.periodOfReport);
+    if (!existing || f.filingDate > existing.filingDate || (f.filingDate === existing.filingDate && f.accessionNumber > existing.accessionNumber)) {
+      byPeriod.set(f.periodOfReport, f);
+    }
+  }
+  return [...byPeriod.values()].sort((a, b) =>
+    a.periodOfReport > b.periodOfReport ? -1 : a.periodOfReport < b.periodOfReport ? 1 : 0
+  );
 }
