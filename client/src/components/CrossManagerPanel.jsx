@@ -109,6 +109,21 @@ export default function CrossManagerPanel() {
       .slice(0, TOP_N);
   }, [result]);
 
+  // Aggregated across every manager checked, not just the Top 20 shown below
+  // — a single manager's outsized buy/sell can otherwise swamp the picture.
+  const netSummary = useMemo(() => {
+    if (!result) return null;
+    let bought = 0;
+    let sold = 0;
+    for (const r of result.results) {
+      if (r.shareDelta > 0) bought += r.shareDelta;
+      else if (r.shareDelta < 0) sold += -r.shareDelta;
+    }
+    const net = bought - sold;
+    const verdict = net > 0 ? 'buy' : net < 0 ? 'sell' : 'neutral';
+    return { bought, sold, net, verdict };
+  }, [result]);
+
   async function searchCusip(cusip, label) {
     setLoading(true);
     setError(null);
@@ -223,6 +238,45 @@ export default function CrossManagerPanel() {
               <span className="neg">{result.sellers} decreasing</span>
             </div>
           </div>
+
+          {netSummary && (
+            <div
+              className={`verdict-card ${netSummary.verdict === 'sell' ? 'sell' : ''}`}
+              style={{ marginTop: 12 }}
+            >
+              <div>
+                <div className="dim" style={{ marginBottom: 6 }}>
+                  Net across all {result.checked} manager(s) checked
+                </div>
+                <div
+                  className={`verdict-big ${
+                    netSummary.verdict === 'buy' ? 'buy' : netSummary.verdict === 'sell' ? 'sell' : ''
+                  }`}
+                >
+                  {netSummary.verdict === 'buy' && '▲ NET BUY'}
+                  {netSummary.verdict === 'sell' && '▼ NET SELL'}
+                  {netSummary.verdict === 'neutral' && 'FLAT'}
+                </div>
+              </div>
+              <div className="stats-grid" style={{ minWidth: 320 }}>
+                <div className="stat-tile">
+                  <div className="label">Total Bought</div>
+                  <div className="value buy">+{fmtShares(netSummary.bought)}</div>
+                </div>
+                <div className="stat-tile">
+                  <div className="label">Total Sold</div>
+                  <div className="value sell">-{fmtShares(netSummary.sold)}</div>
+                </div>
+                <div className="stat-tile">
+                  <div className="label">Net Shares</div>
+                  <div className={`value ${netSummary.verdict === 'buy' ? 'buy' : netSummary.verdict === 'sell' ? 'sell' : ''}`}>
+                    {netSummary.net >= 0 ? '+' : ''}
+                    {fmtShares(netSummary.net)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <MoversTable title={`Top ${TOP_N} Increases (Most Bought)`} rows={topBuys} tone="pos" />
           <MoversTable title={`Top ${TOP_N} Decreases (Most Sold)`} rows={topSells} tone="neg" />
