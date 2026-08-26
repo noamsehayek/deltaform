@@ -17,6 +17,18 @@
 // case-by-case attention same as the two extra APLD CUSIPs that got
 // hand-cleared.
 //
+// A single stray filer entry can taint even a ticker's one true CUSIP (e.g.
+// "ELI LILLY & CO SR NT" showing up once among LLY's 40+ otherwise-clean
+// common-stock names), so per-CUSIP taint alone isn't a safe signal to
+// clear on its own. Instead, for each ticker, whichever CUSIP has
+// accumulated the most distinct issuer names is protected outright — real,
+// actively-traded common stock is what gets cited by dozens of filers over
+// years, so name-count is a strong proxy for "this is the real one" — and
+// taint is only acted on for that ticker's OTHER, less-cited CUSIPs. This
+// guarantees a ticker can never end up with zero resolvable CUSIPs: the
+// richest one always survives, whether or not it happens to carry taint
+// itself.
+//
 // Usage:
 //   node scripts/repair-cusip-index.mjs [path-to-cusip-index.json]   # dry run, prints what would change
 //   node scripts/repair-cusip-index.mjs [path-to-cusip-index.json] --apply   # writes the fix (also writes a .bak alongside it)
@@ -41,14 +53,6 @@ function taintReason(names) {
 
 const idx = JSON.parse(fs.readFileSync(file, 'utf-8'));
 
-// Group by ticker first. A tainted name (e.g. one sloppy filer writing "ELI
-// LILLY & CO SR NT" for what is, everywhere else, plain common stock) can
-// show up even on a ticker's one true common-stock CUSIP — clearing that
-// CUSIP's ticker would leave the ticker completely unresolvable, which is
-// worse than the original bug. So a CUSIP is only ever cleared when at
-// least one *other* CUSIP for the same ticker is untainted — i.e. we're
-// resolving an ambiguity between a real entry and a bogus duplicate, never
-// wiping a ticker's sole (or every) candidate.
 const byTicker = {};
 for (const [cusip, entry] of Object.entries(idx)) {
   if (!entry.ticker) continue; // nothing to clear
@@ -57,10 +61,14 @@ for (const [cusip, entry] of Object.entries(idx)) {
 
 const changes = [];
 for (const list of Object.values(byTicker)) {
-  const hasCleanSibling = list.some((c) => !c.reason);
-  if (!hasCleanSibling) continue;
+  if (list.length < 2) continue; // nothing to disambiguate
+  const maxNames = Math.max(...list.map((c) => (c.entry.names || []).length));
+  // Protect every CUSIP tied for the most names, not just one, so a genuine
+  // tie between two equally-well-established CUSIPs is left for manual
+  // review rather than arbitrarily picking a "winner".
   for (const c of list) {
-    if (c.reason) {
+    const isRichest = (c.entry.names || []).length === maxNames;
+    if (!isRichest && c.reason) {
       changes.push({ cusip: c.cusip, ticker: c.entry.ticker, reason: c.reason, names: c.entry.names, manualTicker: c.entry.manualTicker });
     }
   }
