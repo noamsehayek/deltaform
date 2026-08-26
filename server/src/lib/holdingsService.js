@@ -1,4 +1,4 @@
-import { getSubmissions, get13FFilings, padCik } from './submissions.js';
+import { getSubmissions, get13FFilings, staleNoticeInfo, padCik } from './submissions.js';
 import { getInfoTableForFiling } from './filingDocs.js';
 import { learnCusips } from './cusipResolver.js';
 import { MAJOR_MANAGER_CIKS } from './majorManagers.js';
@@ -14,7 +14,8 @@ export async function listFilings(cik) {
       status: 404,
     });
   }
-  return { manager: { cik: sub.cik10, name: sub.name }, filings };
+  const staleNotice = staleNoticeInfo(sub.filings, filings[0]?.periodOfReport);
+  return { manager: { cik: sub.cik10, name: sub.name }, filings, staleNotice };
 }
 
 // A published filing never changes, so its parsed-and-merged holdings never

@@ -84,3 +84,24 @@ export function get13FFilings(filings) {
     a.periodOfReport > b.periodOfReport ? -1 : a.periodOfReport < b.periodOfReport ? 1 : 0
   );
 }
+
+/**
+ * A large manager can restructure which legal entity files its 13F —
+ * afterward the old CIK files 13F-NT ("holdings reported elsewhere") every
+ * quarter instead of 13F-HR. get13FFilings() only sees HR filings, so it
+ * silently keeps returning that CIK's last real 13F-HR as "current" quarter
+ * after quarter, with nothing to signal it's actually stale (e.g. Vanguard
+ * Group Inc's CIK switched to notices starting Q1 2026 — its holdings are
+ * now reported by ~10 sibling Vanguard entities instead).
+ *
+ * Returns the notice period if this filer's true most recent 13F filing
+ * (any form) is a notice newer than the 13F-HR data being used, else null.
+ */
+export function staleNoticeInfo(filings, latestHrPeriod) {
+  if (!latestHrPeriod) return null; // nothing to compare staleness against
+  const latest = [...filings]
+    .filter((f) => f.form.startsWith('13F'))
+    .sort((a, b) => (a.periodOfReport > b.periodOfReport ? -1 : a.periodOfReport < b.periodOfReport ? 1 : 0))[0];
+  if (!latest || !latest.form.includes('NT') || latest.periodOfReport <= latestHrPeriod) return null;
+  return { noticePeriod: latest.periodOfReport, asOfPeriod: latestHrPeriod };
+}

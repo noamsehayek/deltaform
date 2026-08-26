@@ -94,7 +94,7 @@ export function getCrossManagerProgress(cusip) {
  * waits on two full filing downloads+parses in sequence for no reason.
  */
 async function diffCandidate(cusip, cik, fallbackName) {
-  const { manager, filings } = await listFilings(cik);
+  const { manager, filings, staleNotice } = await listFilings(cik);
   const currentMeta = filings[0];
   if (!currentMeta) return null;
   const priorMeta = filings[1];
@@ -145,6 +145,7 @@ async function diffCandidate(cusip, cik, fallbackName) {
     pctChange,
     valueUsdNow: rowNow?.valueUsd || 0,
     verdict,
+    staleNotice, // set when this manager has since switched to filing 13F-NT (reported via a different CIK) — these numbers are older than "current quarter" despite being the latest 13F-HR on file
   };
 }
 

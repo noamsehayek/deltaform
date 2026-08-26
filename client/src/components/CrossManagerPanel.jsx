@@ -29,6 +29,7 @@ function MoversTable({ title, rows, tone }) {
               <tr>
                 <th></th>
                 <th>Manager</th>
+                <th>As of</th>
                 <th className="num">Shares (prior)</th>
                 <th className="num">Shares (now)</th>
                 <th className="num">Δ Shares</th>
@@ -40,6 +41,17 @@ function MoversTable({ title, rows, tone }) {
                 <tr key={r.cik} className={tone === 'pos' ? 'row-pos' : 'row-neg'}>
                   <td className="dim">{i + 1}</td>
                   <td>{r.name}</td>
+                  <td
+                    className="dim"
+                    title={
+                      r.staleNotice
+                        ? `${r.name} has since filed a 13F-NT for ${r.staleNotice.noticePeriod} — its holdings are now reported through a different, combined filing. This is the last quarter it reported its own numbers, not the current quarter.`
+                        : undefined
+                    }
+                  >
+                    {r.period}
+                    {r.staleNotice ? ' ⚠' : ''}
+                  </td>
                   <td className="num">{fmtShares(r.sharesPrior)}</td>
                   <td className="num">{fmtShares(r.sharesNow)}</td>
                   <td className={`num ${tone}`}>
