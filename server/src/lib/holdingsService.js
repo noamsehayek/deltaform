@@ -66,8 +66,14 @@ export function getFilingHoldings(cikRaw, accessionNumber) {
 
   const promise = (async () => {
     const result = await getInfoTableForFiling(cik, accessionNumber);
-    const allRows = [...result.rows.common, ...result.rows.options, ...result.rows.bonds];
-    await learnCusips(allRows.map((r) => ({ cusip: r.cusip, issuerName: r.nameOfIssuer })));
+    // Only common-stock rows feed the ticker index. A bond or option can
+    // share a CUSIP-adjacent identity with a company's common stock but is a
+    // fundamentally different security with its own holder base — learning a
+    // ticker from a note or option row lets that CUSIP masquerade as the
+    // stock in ticker search (e.g. APLD's 2.75% conv notes CUSIP inheriting
+    // the "APLD" ticker and showing up as a bogus candidate alongside the
+    // real common-stock CUSIP).
+    await learnCusips(result.rows.common.map((r) => ({ cusip: r.cusip, issuerName: r.nameOfIssuer })));
     return result;
   })();
 
