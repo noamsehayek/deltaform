@@ -68,9 +68,13 @@ export default function CrossManagerPanel() {
   const [result, setResult] = useState(null);
   const [progress, setProgress] = useState(null);
 
-  // Total search time is bounded by SEC's rate limit — polling this just
-  // makes the wait legible ("checked 14 of 30") rather than making it
-  // shorter.
+  // Total search time is bounded by SEC's rate limit and can run well past a
+  // minute for a wide search — too long for one request to reliably survive
+  // a proxy in front of it (confirmed in production: Railway's edge proxy
+  // killed a 92s request even though the search itself completed fine
+  // server-side). So the search only gets *started* by searchCusip below;
+  // this effect polls both progress and the actual result the same way,
+  // finalizing once the result comes back done or errored.
   useEffect(() => {
     if (!loading || !activeCusip) {
       setProgress(null);
@@ -82,6 +86,21 @@ export default function CrossManagerPanel() {
         .crossManagerProgress(activeCusip)
         .then((p) => {
           if (!cancelled) setProgress(p);
+        })
+        .catch(() => {});
+      api
+        .crossManagerResult(activeCusip)
+        .then((r) => {
+          if (cancelled) return;
+          if (r.status === 'done') {
+            setResult(r.data);
+            setLoading(false);
+          } else if (r.status === 'error') {
+            setError(r.message);
+            setLoading(false);
+          }
+          // 'running' or 'not_found' (the /start POST hasn't registered the
+          // job yet) — keep polling.
         })
         .catch(() => {});
     };
@@ -131,10 +150,11 @@ export default function CrossManagerPanel() {
     setActiveLabel(label || cusip);
     setActiveCusip(cusip);
     try {
-      setResult(await api.crossManager(cusip, limit));
+      // Just starts the job — the polling effect above picks up the result
+      // once it's ready, so this doesn't block on the search itself.
+      await api.startCrossManager(cusip, limit);
     } catch (err) {
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   }

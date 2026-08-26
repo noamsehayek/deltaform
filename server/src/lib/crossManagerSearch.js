@@ -228,3 +228,53 @@ export async function crossManagerActivity(cusip, limit = 15) {
     }
   }
 }
+
+// --- Fire-and-poll job wrapper ---
+//
+// A wide search (e.g. limit=100) legitimately takes well over a minute:
+// SEC's mandated rate limit (~110ms between requests, non-negotiable —
+// going faster risks the whole app getting IP-blocked) means checking 100
+// managers requires hundreds of sequential requests. That's too long for
+// any single HTTP request to survive a proxy in front of it — confirmed in
+// production, where Railway's own edge proxy killed a 92s request with a
+// 502 even after crossManagerActivity itself completed correctly. So the
+// result is fetched the same way progress already is: start the job, then
+// poll for it, rather than one request blocking until everything finishes.
+//
+// Keyed by CUSIP, same simplification as progressByCusip above: a second
+// concurrent search for the same CUSIP (typically the user changing the
+// "Check N" limit and re-searching before the first run finished) replaces
+// the in-flight job rather than queuing behind it.
+const jobsByCusip = new Map();
+
+const JOB_RETENTION_MS = 5 * 60 * 1000; // long enough for the client to poll up a finished result
+
+export function startCrossManagerSearch(cusip, limit) {
+  const existing = jobsByCusip.get(cusip);
+  if (existing && !existing.settled && existing.limit === limit) return existing;
+
+  const job = { limit, settled: false, result: null, error: null };
+  job.promise = crossManagerActivity(cusip, limit)
+    .then((result) => {
+      job.result = result;
+    })
+    .catch((err) => {
+      job.error = err;
+    })
+    .finally(() => {
+      job.settled = true;
+      setTimeout(() => {
+        if (jobsByCusip.get(cusip) === job) jobsByCusip.delete(cusip);
+      }, JOB_RETENTION_MS).unref();
+    });
+  jobsByCusip.set(cusip, job);
+  return job;
+}
+
+export function getCrossManagerResult(cusip) {
+  const job = jobsByCusip.get(cusip);
+  if (!job) return { status: 'not_found' };
+  if (!job.settled) return { status: 'running' };
+  if (job.error) return { status: 'error', message: job.error.message };
+  return { status: 'done', data: job.result };
+}

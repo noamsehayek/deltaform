@@ -30,6 +30,8 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cusip, ticker }),
     }),
-  crossManager: (cusip, limit) => request(`/cross-manager/${encodeURIComponent(cusip)}?limit=${limit || 15}`),
+  startCrossManager: (cusip, limit) =>
+    request(`/cross-manager/${encodeURIComponent(cusip)}/start?limit=${limit || 15}`, { method: 'POST' }),
+  crossManagerResult: (cusip) => request(`/cross-manager/${encodeURIComponent(cusip)}/result`),
   crossManagerProgress: (cusip) => request(`/cross-manager/${encodeURIComponent(cusip)}/progress`),
 };

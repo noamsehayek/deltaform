@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { crossManagerActivity, getCrossManagerProgress } from '../lib/crossManagerSearch.js';
+import { startCrossManagerSearch, getCrossManagerResult, getCrossManagerProgress } from '../lib/crossManagerSearch.js';
 
 export const crossManagerRouter = Router();
 
@@ -10,11 +10,16 @@ crossManagerRouter.get('/:cusip/progress', (req, res) => {
   res.json(getCrossManagerProgress(req.params.cusip.toUpperCase()) || { checked: 0, total: 0 });
 });
 
-crossManagerRouter.get('/:cusip', async (req, res, next) => {
-  try {
-    const limit = Math.min(Number(req.query.limit) || 30, 100);
-    res.json(await crossManagerActivity(req.params.cusip.toUpperCase(), limit));
-  } catch (err) {
-    next(err);
-  }
+// Kicks off the search and returns immediately — a wide search can take well
+// over a minute (bounded by SEC's rate limit), too long for any single
+// request to reliably survive a proxy in front of it. The client polls
+// /result the same way it already polls /progress.
+crossManagerRouter.post('/:cusip/start', (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 30, 100);
+  startCrossManagerSearch(req.params.cusip.toUpperCase(), limit);
+  res.status(202).json({ started: true });
+});
+
+crossManagerRouter.get('/:cusip/result', (req, res) => {
+  res.json(getCrossManagerResult(req.params.cusip.toUpperCase()));
 });
