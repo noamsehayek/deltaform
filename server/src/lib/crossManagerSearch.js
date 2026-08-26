@@ -28,7 +28,20 @@ async function ftsSearchCusip(cusip, limit) {
     const url = `https://efts.sec.gov/LATEST/search-index?q=%22${encodeURIComponent(
       cusip
     )}%22&forms=13F-HR&from=${from}`;
-    const data = await secFetch(url, { as: 'json', ttlMs: 60 * 60 * 1000 });
+    let data;
+    try {
+      data = await secFetch(url, { as: 'json', ttlMs: 60 * 60 * 1000 });
+    } catch (err) {
+      // Best-effort, per the doc comment above: SEC's own search-index API
+      // can error on a deep `from` offset (observed: a bare 500 at from=200)
+      // even though earlier pages succeeded. Losing this one page shouldn't
+      // discard every candidate already gathered here, and definitely
+      // shouldn't blow up the whole search — including the major-manager
+      // checks running concurrently, which have nothing to do with this
+      // pagination loop.
+      console.warn(`ftsSearchCusip: stopped paging at from=${from}: ${err.message}`);
+      break;
+    }
     const hits = data?.hits?.hits || [];
     if (from === 0) totalMentions = data?.hits?.total?.value ?? hits.length;
     if (hits.length === 0) break;
